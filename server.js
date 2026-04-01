@@ -54,7 +54,7 @@ Analyse this using game theory and return ONLY a valid JSON object with these ex
 
   try {
     const apiKey = process.env.GEMINI_API_KEY;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
     const response = await fetch(url, {
       method: 'POST',
@@ -69,9 +69,11 @@ Analyse this using game theory and return ONLY a valid JSON object with these ex
     });
 
     const data = await response.json();
+    console.log('Gemini response:', JSON.stringify(data).slice(0, 300));
 
     if (!data.candidates || !data.candidates[0]) {
-      return res.status(500).json({ error: 'No response from Gemini.' });
+      const errMsg = data.error ? data.error.message : 'No response from Gemini.';
+      return res.status(500).json({ error: errMsg });
     }
 
     let raw = data.candidates[0].content.parts[0].text.trim();
