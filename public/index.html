@@ -589,7 +589,7 @@ async function runAnalysis() {
     eb.style.display = 'block';
     return;
   }
-  document.getElementById('errorBox').style.display = 'none';
+  eb.style.display = 'none';
 
   var players = document.getElementById('players').value;
   var gameType = document.getElementById('gameType').value;
@@ -602,34 +602,22 @@ async function runAnalysis() {
   spinner.style.display = 'block';
   btnText.textContent = 'Analysing scenario...';
 
-
-
   try {
-    var res = await fetch('https://api.anthropic.com/v1/messages', {
+    var GEMINI_KEY = 'AIzaSyBCB_1fHtmNldbBoRqA1BFkM4jD6mAB2rQ';
+    var systemPrompt = 'You are SitPred, a world-class game theory and competitive strategy analyst. You combine academic game theory (Nash equilibrium, dominant strategies, Prisoner Dilemma, Stackelberg competition, repeated games) with real-world business strategy consulting. When given a business scenario, return ONLY a valid JSON object with these exact fields, no markdown, no backticks, no extra text: { "equilibrium_type": "short label", "stability": "High/Medium/Low", "conflict_risk": "High/Medium/Low", "situation_title": "6-8 word title", "situation_analysis": "2-3 sentences", "players": [{"name": "name", "dominant_move": "action", "reasoning": "1-2 sentences", "is_dominant": true}], "outcomes": [{"label": "name", "probability": 65, "color": "green"}, {"label": "name", "probability": 25, "color": "blue"}, {"label": "name", "probability": 10, "color": "red"}], "recommendation_title": "title", "recommendation": "3-4 sentences", "longterm_title": "title", "longterm": "3-4 sentences" }';
+    var userPrompt = 'Industry: ' + selectedIndustry + '\nPlayers: ' + players + '\nGame type: ' + gameType + '\nScenario: ' + context + '\n\nAnalyse using game theory and return only the JSON.';
+    var res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + GEMINI_KEY, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }]
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt + '\n\n' + userPrompt }] }], generationConfig: { temperature: 0.7, maxOutputTokens: 1500 } })
     });
-
-    var data = await res.json();
-    if (!data.content || !data.content[0]) throw new Error('No response from API');
-    var raw = data.content[0].text.trim();
-    raw = raw.replace(/```json|```/g, '').trim();
-    var parsed = JSON.parse(raw);
-    renderResult(parsed);
+    var resp = await res.json();
+    if (!resp.candidates || !resp.candidates[0]) throw new Error('No response from AI.');
+    var raw = resp.candidates[0].content.parts[0].text.trim().replace(/```json|```/g, '').trim();
+    var data = JSON.parse(raw);
+    renderResult(data);
   } catch(e) {
-    var eb = document.getElementById('errorBox');
-    eb.textContent = 'Analysis failed. Please check your API key is configured and try again. (' + e.message + ')';
+    eb.textContent = 'Analysis failed: ' + e.message;
     eb.style.display = 'block';
   }
 
