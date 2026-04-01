@@ -7,7 +7,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
-app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.post('/api/analyze', async (req, res) => {
   const { context, industry, players, gameType } = req.body;
@@ -18,34 +18,31 @@ app.post('/api/analyze', async (req, res) => {
 
   const systemPrompt = `You are SitPred, a world-class game theory and competitive strategy analyst. You combine academic game theory (Nash equilibrium, dominant strategies, Prisoner's Dilemma, Stackelberg competition, repeated games) with real-world business strategy consulting.
 
-Return ONLY a valid JSON object — no markdown, no backticks, no extra text whatsoever:
+Return ONLY a valid JSON object — no markdown, no backticks, no extra text:
 {
-  "equilibrium_type": "short label e.g. Nash Equilibrium / Dominant Strategy",
+  "equilibrium_type": "short label e.g. Nash Equilibrium",
   "stability": "High / Medium / Low",
   "conflict_risk": "High / Medium / Low",
-  "situation_title": "Sharp 6-8 word title describing the core tension",
-  "situation_analysis": "2-3 sentences. What game theory framework applies and why.",
+  "situation_title": "6-8 word title",
+  "situation_analysis": "2-3 sentences about the game theory framework.",
   "players": [
-    {"name": "Player name", "dominant_move": "Specific action they will take", "reasoning": "1-2 sentence reasoning", "is_dominant": true}
+    {"name": "Player name", "dominant_move": "action", "reasoning": "reasoning", "is_dominant": true}
   ],
   "outcomes": [
-    {"label": "Outcome name", "probability": 65, "color": "green"},
-    {"label": "Outcome name", "probability": 25, "color": "blue"},
-    {"label": "Outcome name", "probability": 10, "color": "red"}
+    {"label": "Most likely outcome", "probability": 65, "color": "green"},
+    {"label": "Second outcome", "probability": 25, "color": "blue"},
+    {"label": "Worst case", "probability": 10, "color": "red"}
   ],
-  "recommendation_title": "Action-oriented title",
-  "recommendation": "3-4 sentences. Concrete strategic recommendation.",
-  "longterm_title": "Long-term prediction title",
-  "longterm": "3-4 sentences. Where does this end up in 2-4 quarters?"
+  "recommendation_title": "Action title",
+  "recommendation": "3-4 sentences of recommendation.",
+  "longterm_title": "Long-term title",
+  "longterm": "3-4 sentences of long-term prediction."
 }`;
 
   const userPrompt = `Industry: ${industry || 'General'}
 Number of players: ${players || '2'}
 Game type: ${gameType || 'simultaneous'}
-
-Scenario:
-${context}
-
+Scenario: ${context}
 Analyse using game theory and return only the JSON.`;
 
   try {
@@ -67,10 +64,10 @@ Analyse using game theory and return only the JSON.`;
     });
 
     const data = await response.json();
-    console.log('Groq response:', JSON.stringify(data).slice(0, 400));
+    console.log('Groq response:', JSON.stringify(data).slice(0, 500));
 
     if (!data.choices || !data.choices[0]) {
-      const errMsg = data.error ? data.error.message : 'No response from Groq.';
+      const errMsg = data.error ? data.error.message : 'No response from AI.';
       return res.status(500).json({ error: errMsg });
     }
 
@@ -86,7 +83,7 @@ Analyse using game theory and return only the JSON.`;
 });
 
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(PORT, () => {
