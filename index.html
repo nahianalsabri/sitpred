@@ -458,15 +458,6 @@
       </div>
     </div>
 
-    <div style="margin-top:24px;margin-bottom:0;">
-      <label class="form-label">Anthropic API key</label>
-      <div style="position:relative;">
-        <input type="password" id="apiKey" placeholder="sk-ant-api03-..." style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;padding:12px 52px 12px 14px;outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor=''">
-        <span onclick="toggleKey()" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:12px;color:var(--text3);user-select:none;font-family:'DM Mono',monospace;" id="keyToggle">show</span>
-      </div>
-      <div style="font-size:11px;color:var(--text3);margin-top:6px;font-family:'DM Mono',monospace;">Never stored. Sent directly to Anthropic only. Get yours at console.anthropic.com</div>
-    </div>
-
     <div style="margin-top: 20px;">
       <button class="submit-btn" id="submitBtn" onclick="runAnalysis()">
         <div class="spinner" id="spinner"></div>
@@ -589,29 +580,16 @@ function resetForm() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function toggleKey() {
-  var inp = document.getElementById('apiKey');
-  var tog = document.getElementById('keyToggle');
-  if (inp.type === 'password') { inp.type = 'text'; tog.textContent = 'hide'; }
-  else { inp.type = 'password'; tog.textContent = 'show'; }
-}
-
 async function runAnalysis() {
   var context = document.getElementById('context').value.trim();
-  var apiKey = document.getElementById('apiKey').value.trim();
   var eb = document.getElementById('errorBox');
 
-  if (!apiKey || !apiKey.startsWith('sk-')) {
-    eb.textContent = 'Please enter a valid Anthropic API key (starts with sk-ant-...).';
-    eb.style.display = 'block';
-    return;
-  }
   if (!context || context.length < 30) {
     eb.textContent = 'Please describe your scenario in more detail (at least a few sentences).';
     eb.style.display = 'block';
     return;
   }
-  document.getElementById('errorBox').style.display = 'none';
+  eb.style.display = 'none';
 
   var players = document.getElementById('players').value;
   var gameType = document.getElementById('gameType').value;
@@ -624,72 +602,22 @@ async function runAnalysis() {
   spinner.style.display = 'block';
   btnText.textContent = 'Analysing scenario...';
 
-  var systemPrompt = `You are SitPred, a world-class game theory and competitive strategy analyst. You combine academic game theory (Nash equilibrium, dominant strategies, Prisoner's Dilemma, Stackelberg competition, repeated games) with real-world business strategy consulting.
-
-When given a business scenario, you produce a structured JSON analysis with these exact fields:
-
-{
-  "equilibrium_type": "short label e.g. Nash Equilibrium / Dominant Strategy / No Pure Strategy",
-  "stability": "High / Medium / Low",
-  "conflict_risk": "High / Medium / Low",
-  "situation_title": "Sharp 6-8 word title describing the core tension",
-  "situation_analysis": "2-3 sentences. What game theory framework applies and why. Be precise and analytical.",
-  "players": [
-    {
-      "name": "Player name or label",
-      "dominant_move": "Specific action they will likely take",
-      "reasoning": "1-2 sentence game theory reasoning",
-      "is_dominant": true/false
-    }
-  ],
-  "outcomes": [
-    { "label": "Outcome name", "probability": 65, "color": "green|blue|amber|red" },
-    { "label": "Outcome name", "probability": 25, "color": "green|blue|amber|red" },
-    { "label": "Outcome name", "probability": 10, "color": "green|blue|amber|red" }
-  ],
-  "recommendation_title": "Sharp action-oriented title for the best strategic move",
-  "recommendation": "3-4 sentences. Specific, concrete strategic recommendation based on game theory. What should the focal player do and why does the theory support it?",
-  "longterm_title": "Sharp title for the long-term market prediction",
-  "longterm": "3-4 sentences. Where does this market/competitive situation end up in 2-4 quarters? What equilibrium does it converge to?"
-}
-
-IMPORTANT: Return ONLY valid JSON. No markdown, no backticks, no extra text.`;
-
-  var userPrompt = `Industry: ${selectedIndustry}
-Number of players: ${players}
-Game type: ${gameType}
-
-Scenario:
-${context}
-
-Analyse this using game theory and return the JSON prediction.`;
-
   try {
-    var res = await fetch('https://api.anthropic.com/v1/messages', {
+    var res = await fetch('/api/analyze', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }]
+        context: context,
+        industry: selectedIndustry,
+        players: players,
+        gameType: gameType
       })
     });
-
     var data = await res.json();
-    if (!data.content || !data.content[0]) throw new Error('No response from API');
-    var raw = data.content[0].text.trim();
-    raw = raw.replace(/```json|```/g, '').trim();
-    var parsed = JSON.parse(raw);
-    renderResult(parsed);
+    if (data.error) throw new Error(data.error);
+    renderResult(data);
   } catch(e) {
-    var eb = document.getElementById('errorBox');
-    eb.textContent = 'Analysis failed. Please check your API key is configured and try again. (' + e.message + ')';
+    eb.textContent = 'Analysis failed: ' + e.message;
     eb.style.display = 'block';
   }
 
