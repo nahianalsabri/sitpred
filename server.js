@@ -16,74 +16,72 @@ app.post('/api/analyze', async (req, res) => {
     return res.status(400).json({ error: 'Please provide a more detailed scenario.' });
   }
 
-  const prompt = `You are SitPred, a world-class game theory and competitive strategy analyst. You combine academic game theory (Nash equilibrium, dominant strategies, Prisoner's Dilemma, Stackelberg competition, repeated games) with real-world business strategy consulting.
+  const systemPrompt = `You are SitPred, a world-class game theory and competitive strategy analyst. You combine academic game theory (Nash equilibrium, dominant strategies, Prisoner's Dilemma, Stackelberg competition, repeated games) with real-world business strategy consulting.
 
-Industry: ${industry || 'General'}
+Return ONLY a valid JSON object — no markdown, no backticks, no extra text whatsoever:
+{
+  "equilibrium_type": "short label e.g. Nash Equilibrium / Dominant Strategy",
+  "stability": "High / Medium / Low",
+  "conflict_risk": "High / Medium / Low",
+  "situation_title": "Sharp 6-8 word title describing the core tension",
+  "situation_analysis": "2-3 sentences. What game theory framework applies and why.",
+  "players": [
+    {"name": "Player name", "dominant_move": "Specific action they will take", "reasoning": "1-2 sentence reasoning", "is_dominant": true}
+  ],
+  "outcomes": [
+    {"label": "Outcome name", "probability": 65, "color": "green"},
+    {"label": "Outcome name", "probability": 25, "color": "blue"},
+    {"label": "Outcome name", "probability": 10, "color": "red"}
+  ],
+  "recommendation_title": "Action-oriented title",
+  "recommendation": "3-4 sentences. Concrete strategic recommendation.",
+  "longterm_title": "Long-term prediction title",
+  "longterm": "3-4 sentences. Where does this end up in 2-4 quarters?"
+}`;
+
+  const userPrompt = `Industry: ${industry || 'General'}
 Number of players: ${players || '2'}
 Game type: ${gameType || 'simultaneous'}
 
 Scenario:
 ${context}
 
-Analyse this using game theory and return ONLY a valid JSON object with these exact fields — no markdown, no backticks, no extra text:
-
-{
-  "equilibrium_type": "short label e.g. Nash Equilibrium / Dominant Strategy / No Pure Strategy",
-  "stability": "High / Medium / Low",
-  "conflict_risk": "High / Medium / Low",
-  "situation_title": "Sharp 6-8 word title describing the core tension",
-  "situation_analysis": "2-3 sentences. What game theory framework applies and why. Be precise and analytical.",
-  "players": [
-    {
-      "name": "Player name or label",
-      "dominant_move": "Specific action they will likely take",
-      "reasoning": "1-2 sentence game theory reasoning",
-      "is_dominant": true
-    }
-  ],
-  "outcomes": [
-    { "label": "Outcome name", "probability": 65, "color": "green|blue|amber|red" },
-    { "label": "Outcome name", "probability": 25, "color": "green|blue|amber|red" },
-    { "label": "Outcome name", "probability": 10, "color": "green|blue|amber|red" }
-  ],
-  "recommendation_title": "Sharp action-oriented title for the best strategic move",
-  "recommendation": "3-4 sentences. Specific, concrete strategic recommendation based on game theory.",
-  "longterm_title": "Sharp title for the long-term market prediction",
-  "longterm": "3-4 sentences. Where does this market situation end up in 2-4 quarters?"
-}`;
+Analyse using game theory and return only the JSON.`;
 
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-
-    const response = await fetch(url, {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
+      },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 1500,
-        }
+        model: 'llama3-8b-8192',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 1500
       })
     });
 
     const data = await response.json();
-    console.log('Gemini response:', JSON.stringify(data).slice(0, 300));
+    console.log('Groq response:', JSON.stringify(data).slice(0, 400));
 
-    if (!data.candidates || !data.candidates[0]) {
-      const errMsg = data.error ? data.error.message : 'No response from Gemini.';
+    if (!data.choices || !data.choices[0]) {
+      const errMsg = data.error ? data.error.message : 'No response from Groq.';
       return res.status(500).json({ error: errMsg });
     }
 
-    let raw = data.candidates[0].content.parts[0].text.trim();
+    let raw = data.choices[0].message.content.trim();
     raw = raw.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(raw);
     res.json(parsed);
 
   } catch (err) {
     console.error('Error:', err.message);
-    res.status(500).json({ error: 'Analysis failed. Please try again.' });
+    res.status(500).json({ error: 'Analysis failed: ' + err.message });
   }
 });
 
