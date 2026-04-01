@@ -16,34 +16,15 @@ app.post('/api/analyze', async (req, res) => {
     return res.status(400).json({ error: 'Please provide a more detailed scenario.' });
   }
 
-  const systemPrompt = `You are SitPred, a world-class game theory and competitive strategy analyst. You combine academic game theory (Nash equilibrium, dominant strategies, Prisoner's Dilemma, Stackelberg competition, repeated games) with real-world business strategy consulting.
+  const systemPrompt = `You are a game theory analyst. You must respond with ONLY a JSON object. No explanation, no markdown, no backticks, no text before or after. Just the raw JSON.
 
-Return ONLY a valid JSON object — no markdown, no backticks, no extra text:
-{
-  "equilibrium_type": "short label e.g. Nash Equilibrium",
-  "stability": "High / Medium / Low",
-  "conflict_risk": "High / Medium / Low",
-  "situation_title": "6-8 word title",
-  "situation_analysis": "2-3 sentences about the game theory framework.",
-  "players": [
-    {"name": "Player name", "dominant_move": "action", "reasoning": "reasoning", "is_dominant": true}
-  ],
-  "outcomes": [
-    {"label": "Most likely outcome", "probability": 65, "color": "green"},
-    {"label": "Second outcome", "probability": 25, "color": "blue"},
-    {"label": "Worst case", "probability": 10, "color": "red"}
-  ],
-  "recommendation_title": "Action title",
-  "recommendation": "3-4 sentences of recommendation.",
-  "longterm_title": "Long-term title",
-  "longterm": "3-4 sentences of long-term prediction."
-}`;
+The JSON must have exactly these fields:
+{"equilibrium_type":"string","stability":"High or Medium or Low","conflict_risk":"High or Medium or Low","situation_title":"string","situation_analysis":"string","players":[{"name":"string","dominant_move":"string","reasoning":"string","is_dominant":true}],"outcomes":[{"label":"string","probability":65,"color":"green"},{"label":"string","probability":25,"color":"blue"},{"label":"string","probability":10,"color":"red"}],"recommendation_title":"string","recommendation":"string","longterm_title":"string","longterm":"string"}`;
 
   const userPrompt = `Industry: ${industry || 'General'}
-Number of players: ${players || '2'}
+Players: ${players || '2'}
 Game type: ${gameType || 'simultaneous'}
-Scenario: ${context}
-Analyse using game theory and return only the JSON.`;
+Scenario: ${context}`;
 
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -58,8 +39,9 @@ Analyse using game theory and return only the JSON.`;
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.7,
-        max_tokens: 1500
+        temperature: 0.3,
+        max_tokens: 1500,
+        response_format: { type: 'json_object' }
       })
     });
 
